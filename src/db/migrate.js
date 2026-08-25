@@ -6,6 +6,8 @@ const fs = require("fs");
 const path = require("path");
 const mysql = require("mysql2/promise");
 const env = require("../config/env");
+const { migrateDashboard } = require("./dashboardMigrate");
+const { migrateContact } = require("./contactMigrate");
 
 async function migrate() {
   // Connect without a database first so we can create it if needed.
@@ -36,6 +38,11 @@ async function migrate() {
     "ALTER TABLE users MODIFY COLUMN role ENUM('student','instructor','employer','administrator','partner','super_admin') NOT NULL DEFAULT 'student'"
   );
   await root.end();
+
+  // Keep the base and dashboard schemas together for fresh installations.
+  // This function call avoids platform-specific shell sequencing.
+  await migrateDashboard();
+  await migrateContact();
 
   console.log(`✔ Schema applied to database "${env.db.database}".`);
 }
