@@ -19,11 +19,10 @@ const env = {
     .filter(Boolean),
 
   db: {
-    host: process.env.DB_HOST || "localhost",
-    port: Number(process.env.DB_PORT || 3306),
-    user: process.env.DB_USER || "root",
-    password: process.env.DB_PASSWORD || "",
-    database: process.env.DB_NAME || "skillbridge",
+    // Full MongoDB connection string, including credentials. Never commit this.
+    uri: required("MONGODB_URI", "mongodb://127.0.0.1:27017/skillbridge"),
+    // Overrides the database named in the URI path when set.
+    name: process.env.MONGODB_DB || "",
   },
 
   jwtSecret: required("JWT_SECRET", "skillbridge-dev-secret"),

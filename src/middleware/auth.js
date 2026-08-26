@@ -24,7 +24,7 @@ async function requireAuth(req, _res, next) {
     }
 
     const user = await userModel.findById(payload.sub);
-    if (!user || !user.is_active) {
+    if (!user || !user.isActive) {
       throw ApiError.unauthorized("Account no longer active");
     }
 

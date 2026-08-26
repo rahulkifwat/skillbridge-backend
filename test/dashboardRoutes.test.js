@@ -19,17 +19,19 @@ const originalDashboardMethods = {
 let currentUser = null;
 let lastActivityUser = null;
 
+// Mirrors what userModel returns for a Mongo document: a string `id` and
+// camelCase fields.
 function rawUser(id, role) {
   return {
-    id,
-    full_name: `${role} user`,
+    id: String(id),
+    fullName: `${role} user`,
     email: `${role}-${id}@example.test`,
     role,
     persona: null,
-    avatar_url: null,
-    is_active: 1,
-    last_login_at: null,
-    created_at: "2026-01-01T00:00:00.000Z",
+    avatarUrl: null,
+    isActive: true,
+    lastLoginAt: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
   };
 }
 
@@ -60,8 +62,8 @@ test.before(() => {
     lastActivityUser = user;
     return [
       { actorUserId: user.id, subjectUserId: user.id, limit },
-      { actorUserId: 99, subjectUserId: user.id, limit },
-      { actorUserId: user.id, subjectUserId: 99, limit },
+      { actorUserId: "99", subjectUserId: user.id, limit },
+      { actorUserId: user.id, subjectUserId: "99", limit },
     ];
   };
   dashboardModel.getPlatformStatus = async () => ({ totalUsers: 2, activeUsers: 2, eventsLast24Hours: 1 });
@@ -124,7 +126,7 @@ test("activity passes the authenticated account to the model and enforces role d
   assert.equal(response.status, 200);
   assert.equal(lastActivityUser.id, partner.id);
   assert.equal(lastActivityUser.role, "partner");
-  assert.deepEqual(response.body.data, [{ actorUserId: 44, subjectUserId: 44, limit: 3 }]);
+  assert.deepEqual(response.body.data, [{ actorUserId: "44", subjectUserId: "44", limit: 3 }]);
 
   const student = rawUser(45, "student");
   currentUser = student;
@@ -132,7 +134,7 @@ test("activity passes the authenticated account to the model and enforces role d
 
   assert.equal(studentResponse.status, 200);
   assert.deepEqual(studentResponse.body.data, [
-    { actorUserId: 45, subjectUserId: 45, limit: 3 },
-    { actorUserId: 99, subjectUserId: 45, limit: 3 },
+    { actorUserId: "45", subjectUserId: "45", limit: 3 },
+    { actorUserId: "99", subjectUserId: "45", limit: 3 },
   ]);
 });

@@ -2,16 +2,22 @@ const asyncHandler = require("../utils/asyncHandler");
 const dashboardModel = require("../models/dashboardModel");
 const { parseDashboardLimit } = require("../utils/dashboardService");
 
+// Mongo ids are ObjectId strings, so these comparisons are string-based.
+// Numeric coercion would turn every id into NaN and silently hide all events.
+function sameId(left, right) {
+  return left != null && right != null && String(left) === String(right);
+}
+
 function visibleActivity(user, events) {
   if (user.role === "student") {
-    return events.filter((event) => Number(event.subjectUserId) === Number(user.id));
+    return events.filter((event) => sameId(event.subjectUserId, user.id));
   }
 
   if (user.role === "partner") {
     return events.filter(
       (event) =>
-        Number(event.actorUserId) === Number(user.id) &&
-        (event.subjectUserId == null || Number(event.subjectUserId) === Number(user.id))
+        sameId(event.actorUserId, user.id) &&
+        (event.subjectUserId == null || sameId(event.subjectUserId, user.id))
     );
   }
 

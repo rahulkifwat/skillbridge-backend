@@ -1,51 +1,49 @@
-const { pool } = require("../config/db");
+const { User } = require("./schemas");
 
-// Columns safe to send to the client — password_hash is never in this list.
-const PUBLIC_COLUMNS =
-  "id, full_name, email, role, persona, avatar_url, is_active, last_login_at, created_at";
+// Mongo hands back `_id` as an ObjectId. Everything above this layer — JWT
+// subjects, API responses, the frontend — works with a plain string `id`.
+function normalize(document) {
+  if (!document) return null;
+  const { _id, __v, ...rest } = document;
+  return { id: String(_id), ...rest };
+}
 
 async function findByEmail(email) {
-  const [rows] = await pool.query(
-    `SELECT ${PUBLIC_COLUMNS}, password_hash FROM users WHERE email = ? LIMIT 1`,
-    [email]
-  );
-  return rows[0] || null;
+  // passwordHash is `select: false` on the schema, so login has to opt in.
+  const document = await User.findOne({ email: String(email).trim().toLowerCase() })
+    .select("+passwordHash")
+    .lean();
+  return normalize(document);
 }
 
 async function findById(id) {
-  const [rows] = await pool.query(
-    `SELECT ${PUBLIC_COLUMNS} FROM users WHERE id = ? LIMIT 1`,
-    [id]
-  );
-  return rows[0] || null;
+  if (!id) return null;
+  const document = await User.findById(id).lean().catch(() => null);
+  return normalize(document);
 }
 
 async function create({ fullName, email, passwordHash, role = "student", persona = null }) {
-  const [result] = await pool.query(
-    `INSERT INTO users (full_name, email, password_hash, role, persona)
-     VALUES (?, ?, ?, ?, ?)`,
-    [fullName, email, passwordHash, role, persona]
-  );
-  return findById(result.insertId);
+  const created = await User.create({ fullName, email, passwordHash, role, persona });
+  return findById(created._id);
 }
 
 async function touchLastLogin(id) {
-  await pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = ?`, [id]);
+  await User.updateOne({ _id: id }, { $set: { lastLoginAt: new Date() } });
 }
 
-// Strips password_hash and reshapes to the camelCase the frontend expects.
-function toPublic(row) {
-  if (!row) return null;
+// Strips passwordHash and returns only the fields the client is allowed to see.
+function toPublic(user) {
+  if (!user) return null;
   return {
-    id: row.id,
-    fullName: row.full_name,
-    email: row.email,
-    role: row.role,
-    persona: row.persona,
-    avatarUrl: row.avatar_url,
-    lastLoginAt: row.last_login_at,
-    createdAt: row.created_at,
+    id: user.id,
+    fullName: user.fullName,
+    email: user.email,
+    role: user.role,
+    persona: user.persona,
+    avatarUrl: user.avatarUrl,
+    lastLoginAt: user.lastLoginAt,
+    createdAt: user.createdAt,
   };
 }
 
-module.exports = { findByEmail, findById, create, touchLastLogin, toPublic };
+module.exports = { findByEmail, findById, create, touchLastLogin, toPublic, normalize };

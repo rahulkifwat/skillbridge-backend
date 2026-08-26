@@ -3,54 +3,55 @@
  * Existing emails are left untouched — rerun as often as you like.
  */
 const bcrypt = require("bcryptjs");
-const { pool } = require("../config/db");
+const { connectDatabase, disconnectDatabase } = require("../config/db");
+const { User } = require("../models/schemas");
 const env = require("../config/env");
 
 const DEMO_USERS = [
   {
-    full_name: "Alex Rivera",
+    fullName: "Alex Rivera",
     email: "alex@skillbridge.com",
     password: "Skill@1234",
     role: "student",
     persona: "college-student",
   },
   {
-    full_name: "Maria Gomez",
+    fullName: "Maria Gomez",
     email: "maria@skillbridge.com",
     password: "Skill@1234",
     role: "student",
     persona: "high-school-student",
   },
   {
-    full_name: "SkillBridge Administrator",
+    fullName: "SkillBridge Administrator",
     email: "admin@skillbridge.com",
     password: "Admin@1234",
     role: "administrator",
     persona: null,
   },
   {
-    full_name: "Jordan Lee",
+    fullName: "Jordan Lee",
     email: "instructor@skillbridge.com",
     password: "Skill@1234",
     role: "instructor",
     persona: null,
   },
   {
-    full_name: "Acme Hiring",
+    fullName: "Acme Hiring",
     email: "employer@skillbridge.com",
     password: "Skill@1234",
     role: "employer",
     persona: null,
   },
   {
-    full_name: "Growth Partners",
+    fullName: "Growth Partners",
     email: "partner@skillbridge.com",
     password: "Skill@1234",
     role: "partner",
     persona: null,
   },
   {
-    full_name: "SkillBridge Super Admin",
+    fullName: "SkillBridge Super Admin",
     email: "superadmin@skillbridge.com",
     password: "Skill@1234",
     role: "super_admin",
@@ -59,23 +60,32 @@ const DEMO_USERS = [
 ];
 
 async function seed() {
+  await connectDatabase();
+
   for (const user of DEMO_USERS) {
-    const hash = await bcrypt.hash(user.password, env.bcryptRounds);
-    const [result] = await pool.query(
-      `INSERT IGNORE INTO users (full_name, email, password_hash, role, persona)
-       VALUES (?, ?, ?, ?, ?)`,
-      [user.full_name, user.email, hash, user.role, user.persona]
-    );
-    const status = result.affectedRows ? "created" : "already exists";
-    console.log(`  ${user.email.padEnd(28)} ${status}`);
+    const existing = await User.exists({ email: user.email });
+    if (existing) {
+      console.log(`  ${user.email.padEnd(28)} already exists`);
+      continue;
+    }
+
+    await User.create({
+      fullName: user.fullName,
+      email: user.email,
+      passwordHash: await bcrypt.hash(user.password, env.bcryptRounds),
+      role: user.role,
+      persona: user.persona,
+    });
+    console.log(`  ${user.email.padEnd(28)} created`);
   }
 
   console.log("\n✔ Seed complete. Demo password: Skill@1234 (admin: Admin@1234)");
-  await pool.end();
 }
 
-seed().catch(async (error) => {
-  console.error("✖ Seed failed:", error.message);
-  await pool.end().catch(() => {});
-  process.exit(1);
-});
+seed()
+  .then(() => disconnectDatabase())
+  .catch(async (error) => {
+    console.error("✖ Seed failed:", error.message);
+    await disconnectDatabase().catch(() => {});
+    process.exit(1);
+  });

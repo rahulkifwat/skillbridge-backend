@@ -1,0 +1,140 @@
+/**
+ * Mongoose schemas for every collection the API touches.
+ *
+ * Field names are camelCase here (the MySQL snake_case column names are gone).
+ * `timestamps` gives each document createdAt/updatedAt automatically.
+ */
+const mongoose = require("mongoose");
+
+const { Schema } = mongoose;
+
+const USER_ROLES = [
+  "student",
+  "instructor",
+  "employer",
+  "administrator",
+  "partner",
+  "super_admin",
+];
+
+const INQUIRY_TYPES = [
+  "student",
+  "employer",
+  "university",
+  "school",
+  "government",
+  "partner",
+  "other",
+];
+
+const CONTACT_STATUSES = ["new", "read", "archived"];
+
+const userSchema = new Schema(
+  {
+    fullName: { type: String, required: true, trim: true, maxlength: 120 },
+    email: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
+      maxlength: 190,
+      unique: true,
+    },
+    // Never selected by default — findByEmail asks for it explicitly so a
+    // stray query can't leak the hash into an API response.
+    passwordHash: { type: String, required: true, select: false },
+    role: { type: String, enum: USER_ROLES, default: "student" },
+    persona: { type: String, default: null, maxlength: 60 },
+    avatarUrl: { type: String, default: null },
+    isActive: { type: Boolean, default: true },
+    lastLoginAt: { type: Date, default: null },
+  },
+  { timestamps: true, collection: "users" }
+);
+
+const notificationSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    title: { type: String, required: true, maxlength: 160 },
+    body: { type: String, required: true },
+    isRead: { type: Boolean, default: false },
+  },
+  { timestamps: true, collection: "notifications" }
+);
+
+notificationSchema.index({ userId: 1, createdAt: -1 });
+notificationSchema.index({ userId: 1, isRead: 1 });
+
+const activityEventSchema = new Schema(
+  {
+    actorUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    subjectUserId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    eventType: { type: String, required: true, maxlength: 120 },
+    metadata: { type: Schema.Types.Mixed, default: null },
+  },
+  { timestamps: true, collection: "activity_events" }
+);
+
+activityEventSchema.index({ actorUserId: 1, createdAt: -1 });
+activityEventSchema.index({ subjectUserId: 1, createdAt: -1 });
+activityEventSchema.index({ eventType: 1, createdAt: -1 });
+activityEventSchema.index({ createdAt: -1 });
+
+const assessmentResultSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    englishLevel: { type: String, default: null, maxlength: 60 },
+    careerReadinessScore: { type: Number, default: null },
+    strengths: { type: [String], default: undefined },
+    improvementAreas: { type: [String], default: undefined },
+    recommendedAcademies: { type: [String], default: undefined },
+    completedAt: { type: Date, default: Date.now },
+  },
+  { timestamps: true, collection: "assessment_results" }
+);
+
+assessmentResultSchema.index({ userId: 1, completedAt: -1 });
+
+const contactMessageSchema = new Schema(
+  {
+    name: { type: String, required: true, trim: true, maxlength: 120 },
+    email: { type: String, required: true, trim: true, lowercase: true, maxlength: 190 },
+    organization: { type: String, default: null, trim: true, maxlength: 160 },
+    inquiryType: { type: String, enum: INQUIRY_TYPES, default: "other" },
+    subject: { type: String, required: true, trim: true, maxlength: 190 },
+    message: { type: String, required: true, maxlength: 5000 },
+    locale: { type: String, default: "en", maxlength: 10 },
+    status: { type: String, enum: CONTACT_STATUSES, default: "new" },
+    ipAddress: { type: String, default: null, maxlength: 45 },
+    userAgent: { type: String, default: null, maxlength: 255 },
+  },
+  { timestamps: true, collection: "contact_messages" }
+);
+
+contactMessageSchema.index({ status: 1, createdAt: -1 });
+contactMessageSchema.index({ email: 1, createdAt: -1 });
+contactMessageSchema.index({ ipAddress: 1, createdAt: -1 });
+
+// `mongoose.models.X ||` keeps re-requiring this file (tests, scripts) from
+// throwing OverwriteModelError.
+const User = mongoose.models.User || mongoose.model("User", userSchema);
+const Notification =
+  mongoose.models.Notification || mongoose.model("Notification", notificationSchema);
+const ActivityEvent =
+  mongoose.models.ActivityEvent || mongoose.model("ActivityEvent", activityEventSchema);
+const AssessmentResult =
+  mongoose.models.AssessmentResult ||
+  mongoose.model("AssessmentResult", assessmentResultSchema);
+const ContactMessage =
+  mongoose.models.ContactMessage || mongoose.model("ContactMessage", contactMessageSchema);
+
+module.exports = {
+  User,
+  Notification,
+  ActivityEvent,
+  AssessmentResult,
+  ContactMessage,
+  USER_ROLES,
+  INQUIRY_TYPES,
+  CONTACT_STATUSES,
+};

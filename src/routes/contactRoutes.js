@@ -3,19 +3,10 @@ const { body } = require("express-validator");
 const validate = require("../middleware/validate");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const contactController = require("../controllers/contactController");
+// One source of truth for the "I am a" options: the schema enum.
+const { INQUIRY_TYPES } = require("../models/schemas");
 
 const router = express.Router();
-
-// Kept in sync with the "I am a" options on the public contact form.
-const INQUIRY_TYPES = [
-  "student",
-  "employer",
-  "university",
-  "school",
-  "government",
-  "partner",
-  "other",
-];
 
 router.post(
   "/",

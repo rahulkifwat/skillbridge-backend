@@ -60,8 +60,8 @@ const login = asyncHandler(async (req, res) => {
   // addresses are registered.
   const invalid = ApiError.unauthorized("Incorrect email or password.");
   if (!user) throw invalid;
-  if (!(await bcrypt.compare(password, user.password_hash))) throw invalid;
-  if (!user.is_active) throw ApiError.forbidden("This account has been deactivated.");
+  if (!(await bcrypt.compare(password, user.passwordHash))) throw invalid;
+  if (!user.isActive) throw ApiError.forbidden("This account has been deactivated.");
 
   await userModel.touchLastLogin(user.id);
 

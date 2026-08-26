@@ -1,14 +1,15 @@
 const app = require("./src/app");
 const env = require("./src/config/env");
-const { assertConnection } = require("./src/config/db");
+const { assertConnection, databaseName } = require("./src/config/db");
 
 async function start() {
   try {
     await assertConnection();
-    console.log(`✔ Connected to MySQL database "${env.db.database}".`);
+    console.log(`✔ Connected to MongoDB database "${databaseName()}".`);
   } catch (error) {
-    console.error("✖ Could not connect to MySQL:", error.message);
-    console.error("  Check DB_HOST / DB_USER / DB_PASSWORD / DB_NAME in backend/.env");
+    console.error("✖ Could not connect to MongoDB:", error.message);
+    console.error("  Check MONGODB_URI in backend/.env");
+    console.error("  For Atlas, also confirm this machine's IP is allowed in Network Access.");
     process.exit(1);
   }
 

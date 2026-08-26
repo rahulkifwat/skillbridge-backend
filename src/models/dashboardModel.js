@@ -1,7 +1,8 @@
-const { pool } = require("../config/db");
+const { User, Notification, ActivityEvent, AssessmentResult } = require("./schemas");
 
 const ADMINISTRATIVE_ROLES = new Set(["administrator", "super_admin"]);
 const MAX_LIMIT = 100;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function normaliseLimit(limit, fallback = 20) {
   const parsed = typeof limit === "string" && limit.trim() === "" ? Number.NaN : Number(limit);
@@ -13,21 +14,37 @@ function numeric(value) {
   return Number(value || 0);
 }
 
-async function firstRow(database, sql, params = []) {
-  const [rows] = await database.query(sql, params);
-  return rows[0] || {};
+// ObjectIds must not reach the API surface — the controller compares ids and
+// the client stores them as strings.
+function idString(value) {
+  return value == null ? null : String(value);
 }
 
-function createDashboardModel(database = pool) {
+function daysAgo(days) {
+  return new Date(Date.now() - days * DAY_MS);
+}
+
+/**
+ * Collections are injected so the unit tests can drive the query logic
+ * without a live MongoDB.
+ */
+function createDashboardModel(collections = {}) {
+  const users = collections.User || User;
+  const notifications = collections.Notification || Notification;
+  const activityEvents = collections.ActivityEvent || ActivityEvent;
+  const assessmentResults = collections.AssessmentResult || AssessmentResult;
+
   async function getUnreadNotifications(userId) {
-    const row = await firstRow(
-      database,
-      `SELECT COUNT(*) AS unreadNotifications
-       FROM notifications
-       WHERE user_id = ? AND is_read = 0`,
-      [userId]
+    return numeric(await notifications.countDocuments({ userId, isRead: false }));
+  }
+
+  async function countRecentActorEvents(userId) {
+    return numeric(
+      await activityEvents.countDocuments({
+        actorUserId: userId,
+        createdAt: { $gte: daysAgo(7) },
+      })
     );
-    return numeric(row.unreadNotifications);
   }
 
   async function getOverview(user) {
@@ -35,76 +52,30 @@ function createDashboardModel(database = pool) {
     const unreadNotifications = await getUnreadNotifications(userId);
 
     if (user.role === "student") {
-      const row = await firstRow(
-        database,
-        `SELECT COUNT(*) AS completedAssessments,
-                COALESCE((
-                  SELECT career_readiness_score
-                  FROM assessment_results
-                  WHERE user_id = ?
-                  ORDER BY completed_at DESC, id DESC
-                  LIMIT 1
-                ), 0) AS latestCareerReadinessScore
-         FROM assessment_results
-         WHERE user_id = ?`,
-        [userId, userId]
-      );
+      const [completedAssessments, latest] = await Promise.all([
+        assessmentResults.countDocuments({ userId }),
+        assessmentResults
+          .findOne({ userId })
+          .sort({ completedAt: -1, _id: -1 })
+          .select("careerReadinessScore")
+          .lean(),
+      ]);
+
       return {
         role: user.role,
         metrics: [
-          { key: "assessmentsCompleted", value: numeric(row.completedAssessments) },
-          { key: "careerReadinessScore", value: numeric(row.latestCareerReadinessScore) },
+          { key: "assessmentsCompleted", value: numeric(completedAssessments) },
+          { key: "careerReadinessScore", value: numeric(latest?.careerReadinessScore) },
           { key: "unreadNotifications", value: unreadNotifications },
         ],
       };
     }
 
-    if (user.role === "instructor") {
-      const row = await firstRow(
-        database,
-        `SELECT COUNT(*) AS recentActivityEvents
-         FROM activity_events
-         WHERE actor_user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`,
-        [userId]
-      );
+    if (user.role === "instructor" || user.role === "employer" || user.role === "partner") {
       return {
         role: user.role,
         metrics: [
-          { key: "recentActivityEvents", value: numeric(row.recentActivityEvents) },
-          { key: "unreadNotifications", value: unreadNotifications },
-        ],
-      };
-    }
-
-    if (user.role === "employer") {
-      const row = await firstRow(
-        database,
-        `SELECT COUNT(*) AS recentActivityEvents
-         FROM activity_events
-         WHERE actor_user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`,
-        [userId]
-      );
-      return {
-        role: user.role,
-        metrics: [
-          { key: "recentActivityEvents", value: numeric(row.recentActivityEvents) },
-          { key: "unreadNotifications", value: unreadNotifications },
-        ],
-      };
-    }
-
-    if (user.role === "partner") {
-      const row = await firstRow(
-        database,
-        `SELECT COUNT(*) AS recentActivityEvents
-         FROM activity_events
-         WHERE actor_user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`,
-        [userId]
-      );
-      return {
-        role: user.role,
-        metrics: [
-          { key: "recentActivityEvents", value: numeric(row.recentActivityEvents) },
+          { key: "recentActivityEvents", value: await countRecentActorEvents(userId) },
           { key: "unreadNotifications", value: unreadNotifications },
         ],
       };
@@ -130,51 +101,55 @@ function createDashboardModel(database = pool) {
   }
 
   async function getNotifications(user, limit) {
-    const safeLimit = normaliseLimit(limit);
-    const [rows] = await database.query(
-      `SELECT id, title, body, is_read AS isRead, created_at AS createdAt
-       FROM notifications
-       WHERE user_id = ?
-       ORDER BY created_at DESC, id DESC
-       LIMIT ?`,
-      [user.id, safeLimit]
-    );
-    return rows;
+    const rows = await notifications
+      .find({ userId: user.id })
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(normaliseLimit(limit))
+      .lean();
+
+    return rows.map((row) => ({
+      id: idString(row._id),
+      title: row.title,
+      body: row.body,
+      isRead: Boolean(row.isRead),
+      createdAt: row.createdAt,
+    }));
   }
 
   async function getActivity(user, limit) {
-    const safeLimit = normaliseLimit(limit);
-    const isAdministrative = ADMINISTRATIVE_ROLES.has(user.role);
-    const query = isAdministrative
-      ? `SELECT id, actor_user_id AS actorUserId, subject_user_id AS subjectUserId,
-                event_type AS eventType, metadata, created_at AS createdAt
-         FROM activity_events
-         ORDER BY created_at DESC, id DESC
-         LIMIT ?`
-      : `SELECT id, actor_user_id AS actorUserId, subject_user_id AS subjectUserId,
-                event_type AS eventType, metadata, created_at AS createdAt
-         FROM activity_events
-         WHERE actor_user_id = ? OR subject_user_id = ?
-         ORDER BY created_at DESC, id DESC
-         LIMIT ?`;
-    const params = isAdministrative ? [safeLimit] : [user.id, user.id, safeLimit];
-    const [rows] = await database.query(query, params);
-    return rows;
+    // Administrators see the whole platform; everyone else sees only events
+    // they took part in.
+    const filter = ADMINISTRATIVE_ROLES.has(user.role)
+      ? {}
+      : { $or: [{ actorUserId: user.id }, { subjectUserId: user.id }] };
+
+    const rows = await activityEvents
+      .find(filter)
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(normaliseLimit(limit))
+      .lean();
+
+    return rows.map((row) => ({
+      id: idString(row._id),
+      actorUserId: idString(row.actorUserId),
+      subjectUserId: idString(row.subjectUserId),
+      eventType: row.eventType,
+      metadata: row.metadata ?? null,
+      createdAt: row.createdAt,
+    }));
   }
 
   async function getPlatformStatus() {
-    const row = await firstRow(
-      database,
-      `SELECT
-         COUNT(*) AS totalUsers,
-         COALESCE(SUM(is_active = 1), 0) AS activeUsers,
-         (SELECT COUNT(*) FROM activity_events WHERE created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)) AS eventsLast24Hours
-       FROM users`
-    );
+    const [totalUsers, activeUsers, eventsLast24Hours] = await Promise.all([
+      users.countDocuments({}),
+      users.countDocuments({ isActive: true }),
+      activityEvents.countDocuments({ createdAt: { $gte: daysAgo(1) } }),
+    ]);
+
     return {
-      totalUsers: numeric(row.totalUsers),
-      activeUsers: numeric(row.activeUsers),
-      eventsLast24Hours: numeric(row.eventsLast24Hours),
+      totalUsers: numeric(totalUsers),
+      activeUsers: numeric(activeUsers),
+      eventsLast24Hours: numeric(eventsLast24Hours),
     };
   }
 
