@@ -28,6 +28,13 @@ const env = {
   jwtSecret: required("JWT_SECRET", "skillbridge-dev-secret"),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
   bcryptRounds: Number(process.env.BCRYPT_ROUNDS || 10),
+
+  frontendOrigin: process.env.FRONTEND_ORIGIN || "http://localhost:2003",
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY || "",
+    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
+  },
 };
 
 module.exports = env;

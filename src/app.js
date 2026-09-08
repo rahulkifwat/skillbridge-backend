@@ -4,6 +4,7 @@ const cookieParser = require("cookie-parser");
 const env = require("./config/env");
 const routes = require("./routes");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
+const spanishController = require("./controllers/spanishAssessmentController");
 
 const app = express();
 
@@ -12,6 +13,11 @@ app.use(
     origin: env.corsOrigins,
     credentials: true,
   })
+);
+app.post(
+  "/api/spanish/billing/webhook",
+  express.raw({ type: "application/json" }),
+  spanishController.stripeWebhook
 );
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));

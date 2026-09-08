@@ -50,6 +50,12 @@ fail with a server-selection timeout.
 | GET    | `/api/dashboard/status`       | Admin     | Platform-wide counts           |
 | POST   | `/api/contact`                | –         | Public contact form submission |
 | GET    | `/api/contact`                | Admin     | Contact message inbox          |
+| POST   | `/api/spanish/assessment/start` | Bearer  | Start a dedicated Spanish diagnostic |
+| GET    | `/api/spanish/assessment/:id/section/:skill` | Bearer | One skill bank, no answer keys |
+| POST   | `/api/spanish/assessment/:id/answers` | Bearer | Save section answers |
+| GET    | `/api/spanish/assessment/:id/review` | Bearer | Completion check |
+| POST   | `/api/spanish/assessment/:id/submit` | Bearer | Score six skills and build profile |
+| GET    | `/api/spanish/profile`        | Bearer    | Latest Spanish Profile |
 
 Responses are always `{ success, message?, data?, errors? }`. Validation failures
 return `errors` as a `{ field: message }` map, which the forms render inline.

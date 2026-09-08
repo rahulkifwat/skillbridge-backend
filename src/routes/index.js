@@ -2,6 +2,7 @@ const express = require("express");
 const authRoutes = require("./authRoutes");
 const dashboardRoutes = require("./dashboardRoutes");
 const contactRoutes = require("./contactRoutes");
+const spanishAssessmentRoutes = require("./spanishAssessmentRoutes");
 
 const router = express.Router();
 
@@ -12,5 +13,6 @@ router.get("/health", (_req, res) => {
 router.use("/auth", authRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/contact", contactRoutes);
+router.use("/spanish", spanishAssessmentRoutes);
 
 module.exports = router;

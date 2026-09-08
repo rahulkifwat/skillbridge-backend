@@ -128,12 +128,72 @@ const AssessmentResult =
 const ContactMessage =
   mongoose.models.ContactMessage || mongoose.model("ContactMessage", contactMessageSchema);
 
+const spanishAttemptSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true },
+    academyId: { type: String, default: "spanish-academy" },
+    userId: { type: String, required: true, index: true },
+    backgroundId: { type: String, required: true },
+    goalId: { type: String, required: true },
+    startLevel: { type: String, required: true },
+    specialty: { type: String, required: true },
+    form: { type: Schema.Types.Mixed, required: true },
+    answers: { type: Schema.Types.Mixed, default: () => ({}) },
+    artifacts: { type: Schema.Types.Mixed, default: () => ({}) },
+    status: { type: String, enum: ["in_progress", "submitted"], default: "in_progress" },
+    scores: { type: Schema.Types.Mixed, default: null },
+    profile: { type: Schema.Types.Mixed, default: null },
+    credential: { type: Schema.Types.Mixed, default: null },
+  },
+  { timestamps: true, collection: "spanish_attempts" }
+);
+
+spanishAttemptSchema.index({ userId: 1, updatedAt: -1 });
+
+const spanishPurchaseSchema = new Schema(
+  {
+    userId: { type: String, required: true, index: true },
+    product: { type: String, enum: ["diagnostic", "membership"], required: true },
+    amountUsd: { type: Number, required: true },
+    status: { type: String, enum: ["paid"], default: "paid" },
+    paidAt: { type: Date, default: Date.now },
+    stripeSessionId: { type: String, default: null, index: true },
+  },
+  { timestamps: true, collection: "spanish_purchases" }
+);
+
+spanishPurchaseSchema.index({ userId: 1, product: 1 }, { unique: true });
+
+const spanishSimulationSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true },
+    userId: { type: String, required: true, index: true },
+    scenarioId: { type: String, required: true },
+    nodeId: { type: String, required: true },
+    history: { type: Schema.Types.Mixed, default: [] },
+    score: { type: Number, default: null },
+    status: { type: String, enum: ["in_progress", "complete"], default: "in_progress" },
+  },
+  { timestamps: true, collection: "spanish_simulations" }
+);
+
+const SpanishAttempt =
+  mongoose.models.SpanishAttempt || mongoose.model("SpanishAttempt", spanishAttemptSchema);
+const SpanishPurchase =
+  mongoose.models.SpanishPurchase || mongoose.model("SpanishPurchase", spanishPurchaseSchema);
+const SpanishSimulation =
+  mongoose.models.SpanishSimulation ||
+  mongoose.model("SpanishSimulation", spanishSimulationSchema);
+
 module.exports = {
   User,
   Notification,
   ActivityEvent,
   AssessmentResult,
   ContactMessage,
+  SpanishAttempt,
+  SpanishPurchase,
+  SpanishSimulation,
   USER_ROLES,
   INQUIRY_TYPES,
   CONTACT_STATUSES,
