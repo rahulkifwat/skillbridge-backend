@@ -23,9 +23,12 @@ function setSessionCookie(res, token) {
   });
 }
 
+const PUBLIC_ROLES = ["student", "instructor", "employer", "partner"];
+
 const register = asyncHandler(async (req, res) => {
-  const { fullName, email, password, role, persona } = req.body;
+  const { fullName, email, password, persona } = req.body;
   const normalizedEmail = email.trim().toLowerCase();
+  const role = PUBLIC_ROLES.includes(req.body.role) ? req.body.role : "student";
 
   if (await userModel.findByEmail(normalizedEmail)) {
     throw ApiError.conflict("An account with this email already exists.");

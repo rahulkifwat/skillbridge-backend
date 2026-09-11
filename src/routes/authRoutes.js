@@ -6,7 +6,7 @@ const authController = require("../controllers/authController");
 
 const router = express.Router();
 
-const ROLES = ["student", "instructor", "employer", "administrator", "partner"];
+const PUBLIC_ROLES = ["student", "instructor", "employer", "partner"];
 
 router.post(
   "/register",
@@ -16,7 +16,7 @@ router.post(
     body("password")
       .isLength({ min: 8 })
       .withMessage("Password must be at least 8 characters."),
-    body("role").optional().isIn(ROLES).withMessage("Choose a valid account type."),
+    body("role").optional().isIn(PUBLIC_ROLES).withMessage("Choose a valid account type."),
     body("persona").optional({ values: "null" }).isString(),
   ],
   validate,
