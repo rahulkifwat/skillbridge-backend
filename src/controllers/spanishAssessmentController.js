@@ -11,9 +11,11 @@ const {
   SKILLS,
   buildForm,
   buildProfile,
+  feedbackForAnswers,
   publicItem,
   skillScores,
 } = require("../utils/spanishAssessment");
+const userModel = require("../models/userModel");
 
 const stripeCheckout = require("../utils/stripeCheckout");
 const { PRODUCTS } = stripeCheckout;
@@ -140,6 +142,8 @@ const start = asyncHandler(async (req, res) => {
     throw ApiError.forbidden("Purchase the USD $25 Spanish diagnostic to begin.");
   }
 
+  await userModel.setAcademy(req.user.id, "spanish");
+
   const { backgroundId, goalId } = req.body || {};
   const excludeItemIds = await store.usedItemIdsForUser(req.user.id);
   const { startLevel, specialty, form } = buildForm(bank, { backgroundId, goalId, excludeItemIds });
@@ -202,7 +206,12 @@ const saveAnswers = asyncHandler(async (req, res) => {
     };
   }
   await store.updateAttempt(attempt.id, { answers, artifacts, updatedAt: new Date().toISOString() });
-  res.json({ success: true, data: { saved: true } });
+  const feedback = feedbackForAnswers(
+    attempt.form.filter((item) => Object.prototype.hasOwnProperty.call(incoming, item.itemId)),
+    answers,
+    artifacts
+  );
+  res.json({ success: true, data: { saved: true, feedback } });
 });
 
 const review = asyncHandler(async (req, res) => {
@@ -266,12 +275,16 @@ const learning = asyncHandler(async (req, res) => {
   });
 });
 
-const listSimulations = asyncHandler(async (_req, res) => {
+const listSimulations = asyncHandler(async (req, res) => {
+  const attempt = await store.latestForUser(req.user.id);
   res.json({
     success: true,
     data: {
+      engine: "master-simulation",
+      recommendedSpecialty: attempt?.specialty || attempt?.profile?.specialty || null,
       scenarios: SCENARIOS.map((row) => ({
         scenarioId: row.scenarioId,
+        trackId: row.trackId || row.specialty,
         title: row.title,
         specialty: row.specialty,
         objective: row.objective,

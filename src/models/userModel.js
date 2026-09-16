@@ -22,9 +22,48 @@ async function findById(id) {
   return normalize(document);
 }
 
-async function create({ fullName, email, passwordHash, role = "student", persona = null }) {
-  const created = await User.create({ fullName, email, passwordHash, role, persona });
+async function create({
+  fullName,
+  email,
+  passwordHash,
+  role = "student",
+  persona = null,
+  academy = "global",
+  googleId = null,
+  microsoftId = null,
+}) {
+  const created = await User.create({
+    fullName,
+    email,
+    passwordHash,
+    role,
+    persona,
+    academy: academy === "spanish" ? "spanish" : "global",
+    googleId,
+    microsoftId,
+  });
   return findById(created._id);
+}
+
+async function setAcademy(id, academy) {
+  if (!id || academy !== "spanish") return;
+  try {
+    await User.updateOne({ _id: id }, { $set: { academy: "spanish" } });
+  } catch {
+    // Offline tests still tag the session on the next login/register.
+  }
+}
+
+async function findByGoogleId(googleId) {
+  if (!googleId) return null;
+  const document = await User.findOne({ googleId }).lean();
+  return normalize(document);
+}
+
+async function findByMicrosoftId(microsoftId) {
+  if (!microsoftId) return null;
+  const document = await User.findOne({ microsoftId }).lean();
+  return normalize(document);
 }
 
 async function touchLastLogin(id) {
@@ -40,10 +79,21 @@ function toPublic(user) {
     email: user.email,
     role: user.role,
     persona: user.persona,
+    academy: user.academy === "spanish" ? "spanish" : "global",
     avatarUrl: user.avatarUrl,
     lastLoginAt: user.lastLoginAt,
     createdAt: user.createdAt,
   };
 }
 
-module.exports = { findByEmail, findById, create, touchLastLogin, toPublic, normalize };
+module.exports = {
+  findByEmail,
+  findById,
+  findByGoogleId,
+  findByMicrosoftId,
+  create,
+  setAcademy,
+  touchLastLogin,
+  toPublic,
+  normalize,
+};

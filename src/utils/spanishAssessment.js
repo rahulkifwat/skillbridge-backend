@@ -90,32 +90,34 @@ function pickFromPool(pool, count, exclude) {
     selected.push(copy.splice(index, 1)[0]);
   }
   if (selected.length < count) {
-    const fallback = pool.filter((item) => !selected.includes(item));
+    const fallback = pool.filter((item) => !selected.includes(item) && !exclude.has(item.itemId));
     while (fallback.length && selected.length < count) {
       const index = Math.floor(Math.random() * fallback.length);
       selected.push(fallback.splice(index, 1)[0]);
     }
   }
+  for (const item of selected) exclude.add(item.itemId);
   return selected;
 }
 
 function itemsForSkill(bank, skill, level, specialty, count, exclude) {
-  const exact = bank.filter(
-    (item) => item.domain === skill && item.cefrLevel === level && item.category === "general"
-  );
-  let picked = pickFromPool(exact, count, exclude);
+  const picked = [];
+  if (specialty && specialty !== "general") {
+    const specialtyPool = bank.filter((item) => item.domain === skill && item.category === specialty);
+    const atLevel = specialtyPool.filter((item) => item.cefrLevel === level);
+    picked.push(...pickFromPool(atLevel.length ? atLevel : specialtyPool, count, exclude));
+  }
+  if (picked.length < count) {
+    const exact = bank.filter(
+      (item) => item.domain === skill && item.cefrLevel === level && item.category === "general"
+    );
+    picked.push(...pickFromPool(exact, count - picked.length, exclude));
+  }
   if (picked.length < count) {
     const nearby = bank.filter(
       (item) => item.domain === skill && item.category === "general" && !picked.includes(item)
     );
-    picked = picked.concat(pickFromPool(nearby, count - picked.length, exclude));
-  }
-  if (specialty && specialty !== "general") {
-    const overlay = bank.filter(
-      (item) => item.domain === skill && item.category === specialty && (item.cefrLevel === level || true)
-    );
-    const extra = pickFromPool(overlay, 1, exclude);
-    if (extra.length) picked.push(extra[0]);
+    picked.push(...pickFromPool(nearby, count - picked.length, exclude));
   }
   return picked;
 }
@@ -200,6 +202,41 @@ function scoreItemDetail(item, value, artifact) {
 
 function scoreItem(item, value, artifact) {
   return scoreItemDetail(item, value, artifact).score;
+}
+
+const PUNITIVE = /\b(wrong|incorrect|false|you failed|that's wrong)\b/i;
+
+function encouragingFeedback(item, score) {
+  const skill = item?.domain || "this skill";
+  let message;
+  if (Number(score) >= 100) {
+    message = `Nice work on ${skill}. That response shows you understood the situation.`;
+  } else if (Number(score) >= 70) {
+    message = `You are communicating clearly in ${skill}. Keep using complete, respectful language.`;
+  } else {
+    message = `Keep going. This ${skill} item helps us find a good starting point — a little more practice here will build confidence.`;
+  }
+  if (PUNITIVE.test(message)) {
+    message = "Keep going. Each attempt helps us place the next practice step.";
+  }
+  return message;
+}
+
+function feedbackForAnswers(form, answers, artifacts) {
+  const safeAnswers = answers && typeof answers === "object" ? answers : {};
+  const safeArtifacts = artifacts && typeof artifacts === "object" ? artifacts : {};
+  const rows = {};
+  for (const item of form || []) {
+    if (safeAnswers[item.itemId] === undefined || safeAnswers[item.itemId] === null || safeAnswers[item.itemId] === "") {
+      continue;
+    }
+    const result = scoreItemDetail(item, safeAnswers[item.itemId], safeArtifacts[item.itemId]);
+    rows[item.itemId] = {
+      message: encouragingFeedback(item, result.score),
+      strong: result.score >= 70,
+    };
+  }
+  return rows;
 }
 
 function skillScores(form, answers, artifacts) {
@@ -326,6 +363,8 @@ module.exports = {
   WRITING_WEIGHTS,
   buildForm,
   buildProfile,
+  encouragingFeedback,
+  feedbackForAnswers,
   cefrFromOverall,
   nextLevel,
   overallFromSkills,

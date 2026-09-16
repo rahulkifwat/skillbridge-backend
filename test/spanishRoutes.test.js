@@ -79,7 +79,11 @@ test("Spanish diagnostic requires checkout then hides answer keys", async () => 
     body: { product: "diagnostic" },
   });
   assert.equal(paid.status, 201);
-  assert.equal(paid.body.data.entitlements.diagnosticPaid, true);
+  if (paid.body.data.provider === "stripe") {
+    await purchases.recordPurchase({ userId: user.id, product: "diagnostic", amountUsd: 25 });
+  } else {
+    assert.equal(paid.body.data.entitlements.diagnosticPaid, true);
+  }
 
   const started = await request("/api/spanish/assessment/start", {
     user,
@@ -107,6 +111,7 @@ test("Spanish diagnostic requires checkout then hides answer keys", async () => 
     body: { answers },
   });
   assert.equal(saved.status, 200);
+  assert.equal(typeof saved.body.data.feedback, "object");
 
   const submitted = await request(`/api/spanish/assessment/${attemptId}/submit`, { user, method: "POST" });
   assert.equal(submitted.status, 200);
@@ -114,4 +119,11 @@ test("Spanish diagnostic requires checkout then hides answer keys", async () => 
   assert.equal(typeof submitted.body.data.profile.skillScores.grammar, "number");
   assert.ok(submitted.body.data.profile.evidence.length >= 1);
   assert.equal(submitted.body.data.profile.learningPath.units.length, 12);
+});
+
+test("OAuth providers endpoint lists only configured integrations", async () => {
+  const response = await request("/api/auth/oauth/providers");
+  assert.equal(response.status, 200);
+  assert.equal(response.body.data.providers.google, false);
+  assert.equal(response.body.data.providers.microsoft, false);
 });

@@ -4,11 +4,18 @@ const env = require("../config/env");
 const userModel = require("../models/userModel");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
+const { resolveAcademy } = require("../utils/spanishSplit");
 
 function signToken(user) {
-  return jwt.sign({ sub: user.id, role: user.role }, env.jwtSecret, {
-    expiresIn: env.jwtExpiresIn,
-  });
+  return jwt.sign(
+    {
+      sub: user.id,
+      role: user.role,
+      academy: user.academy === "spanish" ? "spanish" : "global",
+    },
+    env.jwtSecret,
+    { expiresIn: env.jwtExpiresIn }
+  );
 }
 
 // Mirrors the token into an httpOnly cookie so server components can read the
@@ -29,6 +36,7 @@ const register = asyncHandler(async (req, res) => {
   const { fullName, email, password, persona } = req.body;
   const normalizedEmail = email.trim().toLowerCase();
   const role = PUBLIC_ROLES.includes(req.body.role) ? req.body.role : "student";
+  const academy = resolveAcademy(null, req.body.academy);
 
   if (await userModel.findByEmail(normalizedEmail)) {
     throw ApiError.conflict("An account with this email already exists.");
@@ -41,6 +49,7 @@ const register = asyncHandler(async (req, res) => {
     passwordHash,
     role,
     persona,
+    academy,
   });
 
   const token = signToken(created);
@@ -57,7 +66,7 @@ const login = asyncHandler(async (req, res) => {
   const email = req.body.email.trim().toLowerCase();
   const { password } = req.body;
 
-  const user = await userModel.findByEmail(email);
+  let user = await userModel.findByEmail(email);
 
   // Same message for unknown email and wrong password — don't leak which
   // addresses are registered.
@@ -67,6 +76,11 @@ const login = asyncHandler(async (req, res) => {
   if (!user.isActive) throw ApiError.forbidden("This account has been deactivated.");
 
   await userModel.touchLastLogin(user.id);
+  const academy = resolveAcademy(user.academy, req.body.academy);
+  if (academy === "spanish" && user.academy !== "spanish") {
+    await userModel.setAcademy(user.id, "spanish");
+    user = { ...user, academy: "spanish" };
+  }
 
   const token = signToken(user);
   setSessionCookie(res, token);
@@ -87,4 +101,4 @@ const logout = asyncHandler(async (_req, res) => {
   res.json({ success: true, message: "Logged out." });
 });
 
-module.exports = { register, login, me, logout };
+module.exports = { register, login, me, logout, signToken, setSessionCookie };

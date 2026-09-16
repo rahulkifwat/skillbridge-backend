@@ -30,6 +30,15 @@ const env = {
   bcryptRounds: Number(process.env.BCRYPT_ROUNDS || 10),
 
   frontendOrigin: process.env.FRONTEND_ORIGIN || "http://localhost:2003",
+  apiPublicUrl: process.env.API_PUBLIC_URL || `http://localhost:${Number(process.env.PORT || 5000)}`,
+  oauth: {
+    googleClientId: process.env.GOOGLE_CLIENT_ID || "",
+    googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+    microsoftClientId: process.env.MICROSOFT_CLIENT_ID || "",
+    microsoftClientSecret: process.env.MICROSOFT_CLIENT_SECRET || "",
+    appleClientId: process.env.APPLE_CLIENT_ID || "",
+    appleClientSecret: process.env.APPLE_CLIENT_SECRET || "",
+  },
   stripe: {
     secretKey: process.env.STRIPE_SECRET_KEY || "",
     publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",

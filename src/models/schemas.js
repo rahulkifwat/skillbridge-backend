@@ -44,8 +44,11 @@ const userSchema = new Schema(
     // stray query can't leak the hash into an API response.
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: USER_ROLES, default: "student" },
+    academy: { type: String, enum: ["spanish", "global"], default: "global", index: true },
     persona: { type: String, default: null, maxlength: 60 },
     avatarUrl: { type: String, default: null },
+    googleId: { type: String, default: null, index: true },
+    microsoftId: { type: String, default: null, index: true },
     isActive: { type: Boolean, default: true },
     lastLoginAt: { type: Date, default: null },
   },

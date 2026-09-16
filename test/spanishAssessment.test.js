@@ -25,7 +25,7 @@ test("A1 grammar key from the v1.3 bank scores soy as correct", () => {
   assert.equal(scoreItem(item, 0), 0);
 });
 
-test("beginners receive A0 core items, not mixed English career prompts", () => {
+test("beginners receive A0 core items, not mixed English career prompts", async () => {
   const { startLevel, form } = buildForm(bank, { backgroundId: "never", goalId: "healthcare" });
   assert.equal(startLevel, "A0");
   assert.ok(form.every((item) => item.bankId.startsWith("spanish-")));

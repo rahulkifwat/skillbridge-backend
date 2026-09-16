@@ -16,6 +16,14 @@ const DEMO_USERS = [
     persona: "college-student",
   },
   {
+    fullName: "Luciana Pérez",
+    email: "luciana@skillbridge.com",
+    password: "Skill@1234",
+    role: "student",
+    persona: null,
+    academy: "spanish",
+  },
+  {
     fullName: "Maria Gomez",
     email: "maria@skillbridge.com",
     password: "Skill@1234",
@@ -75,6 +83,7 @@ async function seed() {
       passwordHash: await bcrypt.hash(user.password, env.bcryptRounds),
       role: user.role,
       persona: user.persona,
+      academy: user.academy === "spanish" ? "spanish" : "global",
     });
     console.log(`  ${user.email.padEnd(28)} created`);
   }
