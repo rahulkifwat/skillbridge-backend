@@ -66,6 +66,15 @@ async function findByMicrosoftId(microsoftId) {
   return normalize(document);
 }
 
+async function listStudents() {
+  try {
+    const documents = await User.find({ role: "student", isActive: true }).lean();
+    return documents.map(normalize);
+  } catch {
+    return [];
+  }
+}
+
 async function touchLastLogin(id) {
   await User.updateOne({ _id: id }, { $set: { lastLoginAt: new Date() } });
 }
@@ -93,6 +102,7 @@ module.exports = {
   findByMicrosoftId,
   create,
   setAcademy,
+  listStudents,
   touchLastLogin,
   toPublic,
   normalize,

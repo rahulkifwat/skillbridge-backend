@@ -180,6 +180,34 @@ const spanishSimulationSchema = new Schema(
   { timestamps: true, collection: "spanish_simulations" }
 );
 
+const simulationSessionSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true },
+    userId: { type: String, required: true, index: true },
+    simulationId: { type: String, required: true, index: true },
+    variationId: { type: String, default: null },
+    status: { type: String, enum: ["active", "complete"], default: "active" },
+    turnNumber: { type: Number, default: 1 },
+    collected: { type: [String], default: [] },
+    turns: { type: Schema.Types.Mixed, default: [] },
+    evaluation: { type: Schema.Types.Mixed, default: null },
+    feedback: { type: Schema.Types.Mixed, default: null },
+    previousSessionId: { type: String, default: null },
+  },
+  { timestamps: true, collection: "simulation_sessions" }
+);
+
+const simulationAssignmentSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true },
+    teacherId: { type: String, required: true, index: true },
+    studentId: { type: String, required: true, index: true },
+    simulationId: { type: String, required: true },
+    dueAt: { type: Date, default: null },
+  },
+  { timestamps: true, collection: "simulation_assignments" }
+);
+
 const SpanishAttempt =
   mongoose.models.SpanishAttempt || mongoose.model("SpanishAttempt", spanishAttemptSchema);
 const SpanishPurchase =
@@ -187,6 +215,12 @@ const SpanishPurchase =
 const SpanishSimulation =
   mongoose.models.SpanishSimulation ||
   mongoose.model("SpanishSimulation", spanishSimulationSchema);
+const SimulationSession =
+  mongoose.models.SimulationSession ||
+  mongoose.model("SimulationSession", simulationSessionSchema);
+const SimulationAssignment =
+  mongoose.models.SimulationAssignment ||
+  mongoose.model("SimulationAssignment", simulationAssignmentSchema);
 
 module.exports = {
   User,
@@ -197,6 +231,8 @@ module.exports = {
   SpanishAttempt,
   SpanishPurchase,
   SpanishSimulation,
+  SimulationSession,
+  SimulationAssignment,
   USER_ROLES,
   INQUIRY_TYPES,
   CONTACT_STATUSES,
