@@ -39,4 +39,8 @@ router.get("/simulations", controller.listSimulations);
 router.post("/simulations/start", controller.startSimulation);
 router.post("/simulations/:runId/choose", controller.chooseSimulation);
 
+const videoController = require("../controllers/spanishVideoController");
+router.get("/videos", videoController.list);
+router.post("/videos/:videoId/progress", videoController.recordProgress);
+
 module.exports = router;

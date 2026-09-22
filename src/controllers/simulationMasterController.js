@@ -9,6 +9,9 @@ const programs = require("../data/spanishPrograms");
 const catalog = require("../data/simulationScenarios");
 const { adaptOpening, nextCollected, pickReply } = require("../utils/simulationOrchestrator");
 const { evaluateSession, studentFeedback } = require("../utils/simulationEvaluation");
+const { videoForSimulation } = require("../data/spanishVideos");
+const videoProgress = require("../models/spanishVideoProgressStore");
+const { assertVideoUnlock } = require("../controllers/spanishVideoController");
 
 function publicSession(row, extra = {}) {
   return {
@@ -55,14 +58,18 @@ const listSimulations = asyncHandler(async (req, res) => {
     program: req.query.program,
     level: req.query.level,
   });
+  const unlocked = new Set(await videoProgress.completedSimulationIds(req.user.id));
   res.json({
     success: true,
     data: {
       engine: "simulation-master",
+      videoGate: true,
       simulations: items.map((row) => ({
         ...catalog.publicScenario(row),
         assigned: assignedIds.has(row.id),
         mastery_status: masteryBySim[row.id] || null,
+        required_video_id: videoForSimulation(row.id)?.id || null,
+        unlocked: unlocked.has(row.id),
       })),
     },
   });
@@ -78,6 +85,7 @@ const startSimulation = asyncHandler(async (req, res) => {
   await requireMembership(req.user.id);
   const scenario = catalog.getScenario(req.params.simulationId);
   if (!scenario) throw ApiError.notFound("Simulation not found.");
+  await assertVideoUnlock(req.user.id, scenario.id);
   const history = await sessions.listForUser(req.user.id);
   const previous = history.find((row) => row.simulationId === scenario.id);
   const variation = catalog.pickVariation(scenario, previous?.variationId);
@@ -163,6 +171,7 @@ const retrySession = asyncHandler(async (req, res) => {
   const row = await ownedSession(req, req.params.sessionId);
   const scenario = catalog.getScenario(row.simulationId);
   if (!scenario) throw ApiError.notFound("Simulation not found.");
+  await assertVideoUnlock(req.user.id, scenario.id);
   const variation = catalog.pickVariation(scenario, row.variationId);
   const opening = adaptOpening(scenario, variation, req.body?.learnerLevel);
   const created = await sessions.createSession({

@@ -8,6 +8,7 @@ const userModel = require("../src/models/userModel");
 const app = require("../src/app");
 const purchases = require("../src/models/spanishPurchaseStore");
 const sessions = require("../src/models/simulationSessionStore");
+const videoProgress = require("../src/models/spanishVideoProgressStore");
 const { catalog } = require("../src/data/spanishPrograms");
 const { listPublished, publicScenario, getScenario } = require("../src/data/simulationScenarios");
 const { evaluateSession } = require("../src/utils/simulationEvaluation");
@@ -15,8 +16,9 @@ const { masteryStatus } = require("../src/utils/simulationMastery");
 const { nextCollected, pickReply } = require("../src/utils/simulationOrchestrator");
 
 const originalFindById = userModel.findById;
+let currentUser = null;
 
-function rawUser() {
+function rawUser(overrides = {}) {
   return {
     id: "u-sim-1",
     fullName: "Alex Rivera",
@@ -26,6 +28,7 @@ function rawUser() {
     persona: null,
     avatarUrl: null,
     isActive: true,
+    ...overrides,
   };
 }
 
@@ -52,13 +55,15 @@ async function request(path, { user, method = "GET", body } = {}) {
 }
 
 test.before(() => {
-  userModel.findById = async () => rawUser();
+  currentUser = rawUser();
+  userModel.findById = async () => currentUser;
 });
 
 test.after(() => {
   userModel.findById = originalFindById;
   purchases.resetStore();
   sessions.resetStore();
+  videoProgress.resetStore();
 });
 
 test("master program catalog has 42 programs and flagship IDs", () => {
@@ -108,10 +113,30 @@ test("evaluation scores the spec customer-service example without punitive copy"
 
 test("Simulation Master start, turn, complete, and retry work for a member", async () => {
   const user = rawUser();
+  currentUser = user;
   const blocked = await request("/api/v1/simulations/cs-l1-order-delay/start", { user, method: "POST", body: {} });
   assert.equal(blocked.status, 403);
 
   await purchases.recordPurchase({ userId: user.id, product: "membership", amountUsd: 29 });
+  const videoLocked = await request("/api/v1/simulations/cs-l1-order-delay/start", { user, method: "POST", body: {} });
+  assert.equal(videoLocked.status, 403);
+  assert.match(videoLocked.body.message || "", /Video Master/i);
+
+  for (const position of [1.2, 2.4, 3.6, 4.8, 6, 7.2, 8.4, 9.6, 10]) {
+    const watched = await request("/api/spanish/videos/vid-customer-order/progress", {
+      user,
+      method: "POST",
+      body: { event: "time", position, duration: 10 },
+    });
+    assert.equal(watched.status, 200);
+  }
+  const finished = await request("/api/spanish/videos/vid-customer-order/progress", {
+    user,
+    method: "POST",
+    body: { event: "ended", position: 10, duration: 10 },
+  });
+  assert.equal(finished.body.data.progress.completed, true);
+
   const started = await request("/api/v1/simulations/cs-l1-order-delay/start", { user, method: "POST", body: {} });
   assert.equal(started.status, 201);
   assert.ok(started.body.data.initial_message);
@@ -120,6 +145,7 @@ test("Simulation Master start, turn, complete, and retry work for a member", asy
   const listed = await request("/api/v1/simulations?program=customer_service", { user });
   assert.equal(listed.status, 200);
   assert.ok(listed.body.data.simulations.length >= 1);
+  assert.equal(listed.body.data.simulations.find((row) => row.simulation_id === "cs-l1-order-delay").unlocked, true);
 
   const turned = await request(`/api/v1/simulation-sessions/${sessionId}/responses`, {
     user,
@@ -136,4 +162,25 @@ test("Simulation Master start, turn, complete, and retry work for a member", asy
   const retried = await request(`/api/v1/simulation-sessions/${sessionId}/retry`, { user, method: "POST", body: {} });
   assert.equal(retried.status, 201);
   assert.equal(retried.body.data.retry, true);
+});
+
+test("instructors can assign a published simulation", async () => {
+  const student = rawUser();
+  currentUser = student;
+  const forbidden = await request("/api/v1/teacher/assignments", {
+    user: student,
+    method: "POST",
+    body: { studentId: "u-sim-1", simulationId: "cs-l1-order-delay" },
+  });
+  assert.equal(forbidden.status, 403);
+
+  const instructor = rawUser({ id: "u-teacher-1", role: "instructor", email: "teacher@example.test" });
+  currentUser = instructor;
+  const created = await request("/api/v1/teacher/assignments", {
+    user: instructor,
+    method: "POST",
+    body: { studentId: "u-sim-1", simulationId: "cs-l1-order-delay" },
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.data.assignment.simulationId, "cs-l1-order-delay");
 });

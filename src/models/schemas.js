@@ -208,6 +208,23 @@ const simulationAssignmentSchema = new Schema(
   { timestamps: true, collection: "simulation_assignments" }
 );
 
+const spanishVideoProgressSchema = new Schema(
+  {
+    userId: { type: String, required: true, index: true },
+    videoId: { type: String, required: true, index: true },
+    status: { type: String, enum: ["in_progress", "complete"], default: "in_progress" },
+    maxContinuousSec: { type: Number, default: 0 },
+    lastPositionSec: { type: Number, default: 0 },
+    durationSec: { type: Number, default: 0 },
+    seekResetCount: { type: Number, default: 0 },
+    completed: { type: Boolean, default: false },
+    completedAt: { type: Date, default: null },
+  },
+  { timestamps: true, collection: "spanish_video_progress" }
+);
+
+spanishVideoProgressSchema.index({ userId: 1, videoId: 1 }, { unique: true });
+
 const SpanishAttempt =
   mongoose.models.SpanishAttempt || mongoose.model("SpanishAttempt", spanishAttemptSchema);
 const SpanishPurchase =
@@ -221,6 +238,9 @@ const SimulationSession =
 const SimulationAssignment =
   mongoose.models.SimulationAssignment ||
   mongoose.model("SimulationAssignment", simulationAssignmentSchema);
+const SpanishVideoProgress =
+  mongoose.models.SpanishVideoProgress ||
+  mongoose.model("SpanishVideoProgress", spanishVideoProgressSchema);
 
 module.exports = {
   User,
@@ -233,6 +253,7 @@ module.exports = {
   SpanishSimulation,
   SimulationSession,
   SimulationAssignment,
+  SpanishVideoProgress,
   USER_ROLES,
   INQUIRY_TYPES,
   CONTACT_STATUSES,
