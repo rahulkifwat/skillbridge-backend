@@ -44,6 +44,22 @@ const env = {
     publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
   },
+
+  // Production AI — empty means the curriculum engine and Loop Core run locally.
+  // Skillbridge funds the live token budget; never commit secrets.
+  ai: {
+    openaiKey: process.env.OPENAI_API_KEY || "",
+    openaiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    anthropicKey: process.env.ANTHROPIC_API_KEY || "",
+    anthropicModel: process.env.ANTHROPIC_MODEL || "claude-3-5-haiku-latest",
+    monthlyBudgetUsd: Number(process.env.AI_MONTHLY_BUDGET_USD || 75),
+  },
+  videoProduction: {
+    heygenKey: process.env.HEYGEN_API_KEY || "",
+    synthesiaKey: process.env.SYNTHESIA_API_KEY || "",
+    elevenLabsKey: process.env.ELEVENLABS_API_KEY || "",
+    assetBucket: process.env.VIDEO_ASSET_BUCKET_URL || "",
+  },
 };
 
 module.exports = env;

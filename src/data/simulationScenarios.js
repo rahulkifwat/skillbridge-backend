@@ -1,4 +1,5 @@
 const { ACADEMY_ID } = require("./spanishPrograms");
+const { atmosphereFor } = require("./simulationAtmosphere");
 
 function scenario(partial) {
   return {
@@ -7,7 +8,7 @@ function scenario(partial) {
     version: 1,
     rubricId: "professional-communication-v1",
     rubricVersion: "v1",
-    interactionMode: "text",
+    interactionMode: "speech_text",
     maxTurns: 8,
     ...partial,
   };
@@ -50,6 +51,11 @@ const SCENARIOS = [
     variations: [
       { id: "v-ana", persona: "Ana López", openingMessage: "Buenos días. Pedí un paquete hace dos semanas y todavía no llega." },
       { id: "v-diego", persona: "Diego Ruiz", openingMessage: "Hola. Mi pedido CS-4419 no aparece. Estoy preocupado." },
+    ],
+    masterScript: [
+      "Buenos días, ¿en qué puedo ayudarle?",
+      "¿Me da el número de pedido, por favor?",
+      "Voy a revisar el envío y le mando el seguimiento.",
     ],
     conversationBeats: [
       { id: "greet", assistantMessage: "Buenos días. El pedido es de Ana López. Todavía no llega." },
@@ -94,6 +100,11 @@ const SCENARIOS = [
       { id: "v-maria", persona: "María Soto", openingMessage: "Buenos días. Vengo porque me duele la cabeza desde ayer." },
       { id: "v-carlos", persona: "Carlos Vega", openingMessage: "Hola. Tengo dolor de estómago desde anoche." },
     ],
+    masterScript: [
+      "Buenos días. ¿Cómo se llama, por favor?",
+      "¿Qué le duele hoy?",
+      "¿Toma algún medicamento?",
+    ],
     conversationBeats: [
       { id: "greet", assistantMessage: "Buenos días. Me llamo María Soto." },
       { id: "name", assistantMessage: "Me llamo María Soto." },
@@ -136,6 +147,11 @@ const SCENARIOS = [
       { id: "v-stop", persona: "Luis Mora", openingMessage: "Buenas tardes. ¿Qué pasa, oficial?" },
       { id: "v-window", persona: "Elena Cruz", openingMessage: "No entiendo. ¿Por qué me detiene?" },
     ],
+    masterScript: [
+      "Buenas tardes. Soy oficial de policía.",
+      "¿Me muestra su identificación, por favor?",
+      "Lo detuve porque no respetó la señal de alto.",
+    ],
     conversationBeats: [
       { id: "identify", assistantMessage: "Buenas tardes. Aquí está mi licencia." },
       { id: "id", assistantMessage: "Sí, aquí tiene mi identificación." },
@@ -177,6 +193,11 @@ const SCENARIOS = [
       { id: "v-roof", persona: "Jorge Díaz", openingMessage: "Jefe, ¿dónde trabajo hoy?" },
       { id: "v-ground", persona: "Pablo Herrera", openingMessage: "¿Llevo materiales al patio?" },
     ],
+    masterScript: [
+      "Hoy todos llevan casco y chaleco.",
+      "Usted trabaja en el segundo piso.",
+      "Use la escalera con cuidado.",
+    ],
     conversationBeats: [
       { id: "ppe", assistantMessage: "Sí, ya tengo el casco. ¿Y ahora?" },
       { id: "task", assistantMessage: "Entendido. Voy al segundo piso." },
@@ -209,6 +230,8 @@ function publicScenario(row) {
     difficulty: row.difficulty,
     estimated_duration: row.estimatedDuration,
     interaction_mode: row.interactionMode,
+    atmosphere: atmosphereFor(row.programId),
+    master_script: row.masterScript || [],
     status: row.status,
     version: row.version,
   };

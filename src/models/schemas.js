@@ -193,6 +193,8 @@ const simulationSessionSchema = new Schema(
     evaluation: { type: Schema.Types.Mixed, default: null },
     feedback: { type: Schema.Types.Mixed, default: null },
     previousSessionId: { type: String, default: null },
+    variationMeta: { type: Schema.Types.Mixed, default: null },
+    lastPronunciation: { type: Schema.Types.Mixed, default: null },
   },
   { timestamps: true, collection: "simulation_sessions" }
 );

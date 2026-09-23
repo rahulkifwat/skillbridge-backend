@@ -8,6 +8,7 @@ router.get("/spanish/programs", requireAuth, controller.listPrograms);
 router.get("/simulations", requireAuth, controller.listSimulations);
 router.get("/simulations/:simulationId", requireAuth, controller.getSimulation);
 router.post("/simulations/:simulationId/start", requireAuth, controller.startSimulation);
+router.post("/ai/layout", requireAuth, controller.generateLayout);
 router.post("/simulation-sessions/:sessionId/responses", requireAuth, controller.submitResponse);
 router.post("/simulation-sessions/:sessionId/complete", requireAuth, controller.completeSession);
 router.post("/simulation-sessions/:sessionId/retry", requireAuth, controller.retrySession);

@@ -12,16 +12,22 @@ const { evaluateSession, studentFeedback } = require("../utils/simulationEvaluat
 const { videoForSimulation } = require("../data/spanishVideos");
 const videoProgress = require("../models/spanishVideoProgressStore");
 const { assertVideoUnlock } = require("../controllers/spanishVideoController");
+const { generateScenarioVariation, llmConfigured } = require("../utils/scenarioAi");
+const { productionFlags } = require("../utils/videoProduction");
+const { scorePronunciation } = require("../utils/pronunciation");
+const { atmosphereFor } = require("../data/simulationAtmosphere");
 
 function publicSession(row, extra = {}) {
   return {
     session_id: row.id,
     status: row.status,
     simulation_id: row.simulationId,
-    interaction_mode: "text",
+    interaction_mode: "speech_text",
     turn_number: row.turnNumber,
     variation_id: row.variationId,
+    variation: row.variationMeta || null,
     collected: row.collected,
+    pronunciation: row.lastPronunciation || null,
     ...extra,
   };
 }
@@ -64,12 +70,15 @@ const listSimulations = asyncHandler(async (req, res) => {
     data: {
       engine: "simulation-master",
       videoGate: true,
+      production: productionFlags(),
+      llm: llmConfigured() ? "live" : "curriculum-engine",
       simulations: items.map((row) => ({
         ...catalog.publicScenario(row),
         assigned: assignedIds.has(row.id),
         mastery_status: masteryBySim[row.id] || null,
         required_video_id: videoForSimulation(row.id)?.id || null,
         unlocked: unlocked.has(row.id),
+        atmosphere: atmosphereFor(row.programId),
       })),
     },
   });
@@ -88,13 +97,14 @@ const startSimulation = asyncHandler(async (req, res) => {
   await assertVideoUnlock(req.user.id, scenario.id);
   const history = await sessions.listForUser(req.user.id);
   const previous = history.find((row) => row.simulationId === scenario.id);
-  const variation = catalog.pickVariation(scenario, previous?.variationId);
+  const variation = await generateScenarioVariation(scenario, previous?.variationId);
   const opening = adaptOpening(scenario, variation, req.body?.learnerLevel);
   const record = await sessions.createSession({
     id: crypto.randomUUID(),
     userId: req.user.id,
     simulationId: scenario.id,
     variationId: variation.id,
+    variationMeta: variation,
     status: "active",
     turnNumber: 1,
     collected: [],
@@ -102,11 +112,16 @@ const startSimulation = asyncHandler(async (req, res) => {
     evaluation: null,
     feedback: null,
     previousSessionId: null,
+    lastPronunciation: null,
     updatedAt: new Date().toISOString(),
   });
   res.status(201).json({
     success: true,
-    data: publicSession(record, { initial_message: opening }),
+    data: publicSession(record, {
+      initial_message: opening,
+      atmosphere: atmosphereFor(scenario.programId),
+      master_script: scenario.masterScript || [],
+    }),
   });
 });
 
@@ -128,18 +143,20 @@ const submitResponse = asyncHandler(async (req, res) => {
   if (!scenario) throw ApiError.notFound("Scenario is no longer available.");
   const content = String(req.body?.content || "").trim();
   if (!content) throw ApiError.badRequest("Enter a Spanish response.");
+  const pronunciation = scorePronunciation(content, scenario.masterScript || scenario.targetVocabulary || []);
   const collected = nextCollected(scenario, row.collected, content);
   const turnNumber = (row.turnNumber || 1) + 1;
   const orchestrated = pickReply(scenario, collected, content, turnNumber);
   const turns = [
     ...(row.turns || []),
-    { role: "student", content, at: new Date().toISOString() },
+    { role: "student", content, at: new Date().toISOString(), response_type: req.body?.response_type || "text" },
     { role: "assistant", content: orchestrated.assistant_message, at: new Date().toISOString() },
   ];
   let updated = await sessions.updateSession(row.id, {
     collected,
     turnNumber,
     turns,
+    lastPronunciation: pronunciation,
     updatedAt: new Date().toISOString(),
   });
   if (orchestrated.completion_candidate || turnNumber >= (scenario.maxTurns || 8)) {
@@ -152,6 +169,7 @@ const submitResponse = asyncHandler(async (req, res) => {
         assistant_message: orchestrated.assistant_message,
         completion_candidate: orchestrated.completion_candidate,
         safety_flag: orchestrated.safety_flag,
+        pronunciation,
       }),
       evaluation: updated.evaluation,
       feedback: updated.feedback,
@@ -172,13 +190,14 @@ const retrySession = asyncHandler(async (req, res) => {
   const scenario = catalog.getScenario(row.simulationId);
   if (!scenario) throw ApiError.notFound("Simulation not found.");
   await assertVideoUnlock(req.user.id, scenario.id);
-  const variation = catalog.pickVariation(scenario, row.variationId);
+  const variation = await generateScenarioVariation(scenario, row.variationId);
   const opening = adaptOpening(scenario, variation, req.body?.learnerLevel);
   const created = await sessions.createSession({
     id: crypto.randomUUID(),
     userId: req.user.id,
     simulationId: scenario.id,
     variationId: variation.id,
+    variationMeta: variation,
     status: "active",
     turnNumber: 1,
     collected: [],
@@ -186,11 +205,17 @@ const retrySession = asyncHandler(async (req, res) => {
     evaluation: null,
     feedback: null,
     previousSessionId: row.id,
+    lastPronunciation: null,
     updatedAt: new Date().toISOString(),
   });
   res.status(201).json({
     success: true,
-    data: publicSession(created, { initial_message: opening, retry: true }),
+    data: publicSession(created, {
+      initial_message: opening,
+      retry: true,
+      atmosphere: atmosphereFor(scenario.programId),
+      master_script: scenario.masterScript || [],
+    }),
   });
 });
 
@@ -330,6 +355,31 @@ const archiveScenario = asyncHandler(async (req, res) => {
   res.json({ success: true, data: catalog.publicScenario(saved) });
 });
 
+const generateLayout = asyncHandler(async (req, res) => {
+  const simulationId = String(req.body?.simulationId || req.body?.scenarioId || "").trim();
+  const scenario = catalog.getScenario(simulationId);
+  if (!scenario) throw ApiError.notFound("Simulation not found.");
+  await requireMembership(req.user.id);
+  await assertVideoUnlock(req.user.id, scenario.id);
+  const variation = await generateScenarioVariation(scenario, req.body?.previousVariationId);
+  res.json({
+    success: true,
+    data: {
+      engine: llmConfigured() ? "openai-claude" : "curriculum-engine",
+      production: productionFlags(),
+      simulation_id: scenario.id,
+      curriculum: {
+        program_id: scenario.programId,
+        cefr: scenario.cefr,
+        target_vocabulary: scenario.targetVocabulary,
+        objectives: (scenario.objectives || []).map((item) => item.label),
+      },
+      variation,
+      atmosphere: atmosphereFor(scenario.programId),
+    },
+  });
+});
+
 module.exports = {
   listPrograms,
   listSimulations,
@@ -349,4 +399,5 @@ module.exports = {
   updateScenario,
   publishScenario,
   archiveScenario,
+  generateLayout,
 };

@@ -62,7 +62,8 @@ test.after(() => {
 test("Video Master catalog maps flagship programs to simulations", () => {
   const videos = listVideos();
   assert.equal(videos.length, 4);
-  assert.ok(videos.every((row) => row.src && row.simulationId && row.durationHintMin === 2));
+  assert.ok(videos.every((row) => !row.src && row.script?.length >= 8 && row.simulationId && row.durationHintMin === 2));
+  assert.ok(videos.every((row) => row.presenter?.uniform));
 });
 
 function watchThrough(row, duration = 10, step = 1.2) {
@@ -100,6 +101,8 @@ test("video progress API rejects skip-complete and unlocks after a full watch", 
   assert.equal(listed.status, 200);
   assert.equal(listed.body.data.engine, "video-master");
   assert.equal(listed.body.data.simulationUnlocked, false);
+  assert.equal(listed.body.data.production.heygen, false);
+  assert.ok(listed.body.data.videos[0].layout.durationSec >= 120);
 
   const skipped = await request("/api/spanish/videos/vid-customer-order/progress", {
     user,

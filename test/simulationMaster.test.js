@@ -140,12 +140,16 @@ test("Simulation Master start, turn, complete, and retry work for a member", asy
   const started = await request("/api/v1/simulations/cs-l1-order-delay/start", { user, method: "POST", body: {} });
   assert.equal(started.status, 201);
   assert.ok(started.body.data.initial_message);
+  assert.ok(started.body.data.variation.fieldCondition);
   const sessionId = started.body.data.session_id;
 
   const listed = await request("/api/v1/simulations?program=customer_service", { user });
   assert.equal(listed.status, 200);
   assert.ok(listed.body.data.simulations.length >= 1);
-  assert.equal(listed.body.data.simulations.find((row) => row.simulation_id === "cs-l1-order-delay").unlocked, true);
+  const customer = listed.body.data.simulations.find((row) => row.simulation_id === "cs-l1-order-delay");
+  assert.equal(customer.unlocked, true);
+  assert.ok(customer.atmosphere.loops.length >= 1);
+  assert.ok(customer.master_script.length >= 1);
 
   const turned = await request(`/api/v1/simulation-sessions/${sessionId}/responses`, {
     user,
@@ -154,6 +158,7 @@ test("Simulation Master start, turn, complete, and retry work for a member", asy
   });
   assert.equal(turned.status, 200);
   assert.ok(turned.body.data.assistant_message);
+  assert.ok(["green", "yellow", "red"].includes(turned.body.data.pronunciation.band));
 
   const completed = await request(`/api/v1/simulation-sessions/${sessionId}/complete`, { user, method: "POST", body: {} });
   assert.equal(completed.status, 200);
