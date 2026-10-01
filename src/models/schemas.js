@@ -227,6 +227,31 @@ const spanishVideoProgressSchema = new Schema(
 
 spanishVideoProgressSchema.index({ userId: 1, videoId: 1 }, { unique: true });
 
+// Production Master Blueprint (SBS-2026-PRODUCTION-002) module sessions:
+// the 90s observation phase, the three stage results, and the compliance review.
+const blueprintSessionSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true },
+    userId: { type: String, required: true, index: true },
+    moduleId: { type: String, required: true, index: true },
+    lessonId: { type: String, required: true },
+    courseTitle: { type: String, default: null },
+    status: {
+      type: String,
+      enum: ["video", "simulation", "complete"],
+      default: "video",
+    },
+    currentStageId: { type: String, default: "ST-01" },
+    videoCompletedAt: { type: Date, default: null },
+    elapsedSeconds: { type: Number, default: 0 },
+    stageResults: { type: [Schema.Types.Mixed], default: [] },
+    review: { type: Schema.Types.Mixed, default: null },
+  },
+  { timestamps: true, collection: "blueprint_sessions" }
+);
+
+blueprintSessionSchema.index({ userId: 1, moduleId: 1, createdAt: -1 });
+
 const SpanishAttempt =
   mongoose.models.SpanishAttempt || mongoose.model("SpanishAttempt", spanishAttemptSchema);
 const SpanishPurchase =
@@ -243,6 +268,9 @@ const SimulationAssignment =
 const SpanishVideoProgress =
   mongoose.models.SpanishVideoProgress ||
   mongoose.model("SpanishVideoProgress", spanishVideoProgressSchema);
+const BlueprintSession =
+  mongoose.models.BlueprintSession ||
+  mongoose.model("BlueprintSession", blueprintSessionSchema);
 
 module.exports = {
   User,
@@ -256,6 +284,7 @@ module.exports = {
   SimulationSession,
   SimulationAssignment,
   SpanishVideoProgress,
+  BlueprintSession,
   USER_ROLES,
   INQUIRY_TYPES,
   CONTACT_STATUSES,

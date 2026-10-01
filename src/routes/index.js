@@ -4,6 +4,7 @@ const dashboardRoutes = require("./dashboardRoutes");
 const contactRoutes = require("./contactRoutes");
 const spanishAssessmentRoutes = require("./spanishAssessmentRoutes");
 const simulationMasterRoutes = require("./simulationMasterRoutes");
+const blueprintRoutes = require("./blueprintRoutes");
 
 const router = express.Router();
 
@@ -16,5 +17,6 @@ router.use("/dashboard", dashboardRoutes);
 router.use("/contact", contactRoutes);
 router.use("/spanish", spanishAssessmentRoutes);
 router.use("/v1", simulationMasterRoutes);
+router.use("/blueprint", blueprintRoutes);
 
 module.exports = router;

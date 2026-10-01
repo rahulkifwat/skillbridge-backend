@@ -1,10 +1,15 @@
 const express = require("express");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const controller = require("../controllers/simulationMasterController");
+const lawController = require("../controllers/lawEnforcementController");
 
 const router = express.Router();
 
 router.get("/spanish/programs", requireAuth, controller.listPrograms);
+router.get("/spanish/programs/law/units/1", requireAuth, lawController.getUnit);
+router.get("/spanish/programs/law/units/1/lessons/:lessonId", requireAuth, lawController.getLessonDetail);
+router.get("/spanish/programs/law/units/1/forms", requireAuth, lawController.listClassroomForms);
+router.post("/spanish/programs/law/units/1/forms", requireAuth, lawController.saveClassroomForm);
 router.get("/simulations", requireAuth, controller.listSimulations);
 router.get("/simulations/:simulationId", requireAuth, controller.getSimulation);
 router.post("/simulations/:simulationId/start", requireAuth, controller.startSimulation);

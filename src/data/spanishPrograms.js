@@ -60,6 +60,7 @@ function getProgram(id) {
 }
 
 function catalog() {
+  const { unit } = require("./lawEnforcementUnit1");
   return {
     academyId: ACADEMY_ID,
     hierarchy: ["program", "level", "unit", "lesson", "learning_activities", "simulation", "assessment", "mastery"],
@@ -68,6 +69,7 @@ function catalog() {
       programs: PROGRAMS.filter((row) => row.groupId === group.id),
     })),
     flagshipProgramIds: FLAGSHIP_IDS,
+    featuredUnits: [unit()],
   };
 }
 

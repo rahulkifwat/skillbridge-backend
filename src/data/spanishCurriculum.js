@@ -56,18 +56,32 @@ const UNITS = {
 function curriculumForProfile(profile) {
   const band = BANDS[profile.cefrLevel] || "foundational";
   const priorities = (profile.priorities || []).map((item) => item.skill);
+  const specialty = String(profile.specialty || profile.specialtyLabel || "").toLowerCase();
+  const law = /law|enforcement|orden/.test(specialty);
+  const baseUnits = UNITS[band].map((title, index) => ({
+    index: index + 1,
+    title,
+    status: index === 0 ? "next" : "locked",
+    emphasis: priorities[index] || null,
+  }));
   return {
     level: profile.cefrLevel,
     band,
     specialty: profile.specialtyLabel,
-    units: UNITS[band].map((title, index) => ({
-      index: index + 1,
-      title,
-      status: index === 0 ? "next" : "locked",
-      emphasis: priorities[index] || null,
-    })),
+    units: law
+      ? [
+          {
+            index: 1,
+            title: "Law Enforcement Spanish L1 · Unit 1: Foundational Field Communication",
+            status: "next",
+            href: "/spanish/programs/law",
+            emphasis: "field communication",
+          },
+          ...baseUnits.slice(1),
+        ]
+      : baseUnits,
     practiceRule: "85% practice / 15% concise theory",
-    nextActivity: profile.nextMilestone,
+    nextActivity: law ? "Open Law Enforcement Unit 1" : profile.nextMilestone,
   };
 }
 

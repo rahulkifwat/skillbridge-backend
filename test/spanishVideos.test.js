@@ -61,8 +61,9 @@ test.after(() => {
 
 test("Video Master catalog maps flagship programs to simulations", () => {
   const videos = listVideos();
-  assert.equal(videos.length, 4);
+  assert.equal(videos.length, 8);
   assert.ok(videos.every((row) => !row.src && row.script?.length >= 8 && row.simulationId && row.durationHintMin === 2));
+  assert.ok(videos.filter((row) => row.programId === "law").length >= 5);
   assert.ok(videos.every((row) => row.presenter?.uniform));
 });
 
