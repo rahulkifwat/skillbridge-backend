@@ -11,7 +11,10 @@ router.use(requireAuth);
 router.get("/billing", controller.billing);
 router.post(
   "/billing/checkout",
-  [body("product").isIn(["diagnostic", "membership"])],
+  [
+    body("product").isIn(["diagnostic", "membership"]),
+    body("returnTo").optional({ values: "falsy" }).isString().isLength({ max: 200 }),
+  ],
   validate,
   controller.checkout
 );

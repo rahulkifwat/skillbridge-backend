@@ -25,10 +25,24 @@ function client() {
   return new Stripe(env.stripe.secretKey);
 }
 
-async function createEmbeddedSession({ productKey, user }) {
+/**
+ * Only same-site absolute paths may be used as a return destination. A bare
+ * "/" prefix is not enough: "//evil.com" and "/\evil.com" are protocol-relative
+ * and would send the customer off-site after paying.
+ */
+function safeReturnPath(value, fallback = "/spanish/assessment") {
+  const path = String(value || "").trim();
+  if (!path.startsWith("/")) return fallback;
+  if (path.startsWith("//") || path.startsWith("/\\")) return fallback;
+  // Strip any query or hash; the Stripe params are appended by the caller.
+  return path.split(/[?#]/)[0];
+}
+
+async function createEmbeddedSession({ productKey, user, returnTo }) {
   const catalog = PRODUCTS[productKey];
   const stripe = client();
   if (!catalog || !stripe) return null;
+  const destination = safeReturnPath(returnTo);
 
   const session = await stripe.checkout.sessions.create({
     mode: catalog.mode,
@@ -47,7 +61,7 @@ async function createEmbeddedSession({ productKey, user }) {
         },
       },
     ],
-    return_url: `${env.frontendOrigin}/spanish/assessment?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+    return_url: `${env.frontendOrigin}${destination}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
   });
 
   return {
@@ -78,6 +92,7 @@ function constructWebhookEvent(rawBody, signature) {
 
 module.exports = {
   PRODUCTS,
+  safeReturnPath,
   isConfigured,
   createEmbeddedSession,
   paidSession,

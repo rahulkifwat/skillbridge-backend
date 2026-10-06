@@ -80,6 +80,8 @@ const checkout = asyncHandler(async (req, res) => {
     const session = await stripeCheckout.createEmbeddedSession({
       productKey: key,
       user: req.user,
+      // Send the customer back to whichever page started the checkout.
+      returnTo: req.body?.returnTo,
     });
     return res.status(201).json({
       success: true,
